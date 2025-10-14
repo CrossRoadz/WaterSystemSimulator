@@ -17,6 +17,7 @@ class GraphicTypes(Enum):
 	Box = "Box"
 	Valve = "Valve"
 	Particle = "Particle"
+	Indicator = "Indicator"
 
 #main class
 class System():
@@ -56,6 +57,7 @@ class System():
 		self.Wires = []
 		self.Boxes = []
 		self.Valves = []
+		self.Indicators = []
 		self.AllObjects = []
 		self.TimeRunning = 0
 		self.MinutesPassed = 0
@@ -124,6 +126,8 @@ class System():
 			pass
 		elif isinstance(obj, Valve):
 			self.Valves.append(obj)
+		elif isinstance(obj, Indicator):
+			self.Indicators.append(obj)
 		elif isinstance(obj, Tank):
 			self.Tanks.append(obj)
 		else:
@@ -131,6 +135,7 @@ class System():
 			return
 
 		self.AllObjects.append(obj)
+		return obj
 
 	def MakePump(self, sourceLabel, endLabel, flowRate, myLabel = ""):
 		#make pump in refernce to its input/output tanks
@@ -276,6 +281,9 @@ class System():
 				for particle in tank.Particles:
 					particle.Update()
 
+		for indicator in self.Indicators:
+			indicator.CheckCondition(self)
+
 
 
 
@@ -292,7 +300,7 @@ class GraphicObject():
 
 		if kind in (GraphicTypes.Tank, GraphicTypes.Sink, GraphicTypes.Well):
 			self.ImageLabel = System.TextFontLarge.render(self.Label, True, (0,0,0))
-		elif kind in (GraphicTypes.Pump, GraphicTypes.Valve):
+		elif kind in (GraphicTypes.Pump, GraphicTypes.Valve, GraphicTypes.Indicator):
 			self.ImageLabel = System.TextFontSmall.render(self.Label, True, (100,100,100))
 
 	def __str__(self):
@@ -600,6 +608,32 @@ class Valve(GraphicObject):
 		wn.blit(self.ImageLabel, (self.X - self.ImageLabel.get_width()//2, self.Rect.y - System.TEXT_GAP - System.FontSizeSmall))
 		pygame.draw.circle(wn, colour, (self.X, self.Y), self.Radius)
 		pygame.draw.circle(wn, (0,0,0), (self.X, self.Y), self.Radius, 2)
+
+class Indicator(GraphicObject):
+	def __init__ (self, x, y, colours, label):
+		super(Indicator, self).__init__(x, y, label, GraphicTypes.Indicator)
+		self.ColourOff, self.ColourOn = colours
+		self.Radius = 15
+		self.Enabled = False
+		self.Update()
+
+	def Update(self):
+		self.Rect = pygame.Rect(self.X - self.Radius,self.Y - self.Radius,self.Radius*2 ,self.Radius*2)
+
+	def CheckCondition(self, system):
+		pass
+
+	def Draw(self, wn):
+		wn.blit(self.ImageLabel, (self.X - self.ImageLabel.get_width()//2, self.Y + self.Radius + System.TEXT_GAP))
+		pygame.draw.rect(wn, (200,200,200), (self.X-3-self.Radius, self.Y-3-self.Radius, self.Radius*2+6, self.Radius*2+6))
+		pygame.draw.rect(wn, (50,50,50), (self.X-3-self.Radius, self.Y-3-self.Radius, self.Radius*2+6, self.Radius*2+6), width = 2)
+		colour = self.ColourOn if self.Enabled else self.ColourOff
+		pygame.draw.circle(wn, colour, (self.X, self.Y), self.Radius)
+		pygame.draw.circle(wn, (0,0,0), (self.X, self.Y), self.Radius, 2)
+		pygame.draw.circle(wn, (50,50,50), (self.X, self.Y), self.Radius//2, 1)
+
+
+
 
 class WaterParticle(GraphicObject):
 	Particles = 0
