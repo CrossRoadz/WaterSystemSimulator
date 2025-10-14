@@ -1,0 +1,32 @@
+246;488;Raw Water;GraphicTypes.Tank
+825;500;Clean Water;GraphicTypes.Tank
+700;50;Water Tower;GraphicTypes.Tank
+1252;202;Hill Sink;GraphicTypes.Sink
+1350;600;Valley Sink;GraphicTypes.Sink
+28;164;Wells;GraphicTypes.Well
+222;261;RW Pump;GraphicTypes.Pump
+664;547;Treatment Pump;GraphicTypes.Pump
+1154;407;Tower Pump;GraphicTypes.Pump
+1251;632;Valley Sink Pump;GraphicTypes.Pump
+1046;182;Hill Sink Pump;GraphicTypes.Pump
+569;574;Treatment Valve;GraphicTypes.Valve
+244;282;Well Pump Relay;GraphicTypes.Relay
+686;568;Treating Pump Relay;GraphicTypes.Relay
+1176;428;Tower Pump Relay;GraphicTypes.Relay
+1068;203;Hill Sink Relay;GraphicTypes.Relay
+1273;653;Valley Sink Relay;GraphicTypes.Relay
+1198;428;Tower Pump Relay manual;GraphicTypes.Relay
+591;595;TV Relay manual;GraphicTypes.Relay
+162;197;WELL HIGH;GraphicTypes.Float
+474;497;RW HIGH;GraphicTypes.Float
+474;588;RW LOW;GraphicTypes.Float
+1153;513;CW HIGH;GraphicTypes.Float
+1153;644;CW LOW;GraphicTypes.Float
+1153;582;CW MID;GraphicTypes.Float
+951;59;TW HIGH;GraphicTypes.Float
+951;160;TW LOW;GraphicTypes.Float
+1378;233;HS LOW;GraphicTypes.Float
+1467;629;VS LOW;GraphicTypes.Float
+185;209;RW Sediment Filters;GraphicTypes.Box
+520;454;DW Treatment (1µm, Cl, UV);GraphicTypes.Box
+1111;329;High Pressure;GraphicTypes.Box
