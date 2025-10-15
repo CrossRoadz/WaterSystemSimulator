@@ -357,7 +357,8 @@ class Tank(GraphicObject):
 		self.OutputPoint = (self.X + self.Width, self.Y + self.Height)
 		#for small text
 		self.FillImage = System.TextFontSmall.render(f"{int(self.Fill)}gal, 0gal/min", True, (0,0,0))
-		pnum = self.Width // 10
+		
+		pnum = self.Width // WaterParticle.Radius #adds particles bades on width
 		if not System.PARTICLES: pnum = 0
 		self.Particles = [WaterParticle(self) for i in range(pnum)]
 
@@ -482,7 +483,7 @@ class Relay(GraphicObject):
 		self.Width = self.Size
 		self.Rect = pygame.Rect(x,y,self.Width,self.Height)
 
-		self.ImageLabel = System.TextFontSmall.render(f"{"M" if manualSwitch else "A"}", True, GraphicObject.grey)
+		self.ImageLabel = System.TextFontSmall.render("M" if manualSwitch else "A", True, GraphicObject.grey)
 
 		self.Triggered = False
 		self.HIGHtrigger = None
@@ -637,6 +638,7 @@ class Indicator(GraphicObject):
 
 class WaterParticle(GraphicObject):
 	Particles = 0
+	Radius = 9
 	def __init__ (self, tank):
 		WaterParticle.Particles += 1
 		self.Tank = tank
@@ -644,12 +646,12 @@ class WaterParticle(GraphicObject):
 		x, y = tank.X, tank.Y
 		super(WaterParticle, self).__init__(x, y, "", GraphicTypes.Particle)
 
-		self.Radius = 9 #partilce size
+		self.Radius = WaterParticle.Radius #partilce size
 		self.decayChance = 15 #1/chance to deactivated per tick once flow stop
 		self.maxSpd = 2 #max downward spd of partilce
 		self.startingV = -2.5 #starting upward spd
 		self.lifeSpanRange = (20,35) #randrange lifespan
-		self.g = 0.3 #force of gravity
+		self.g = 0.25 #force of gravity
 		self.colour = WaterParticle.getColour() #random very light blue colour
 
 		self.LifeSpan = CappedNumber(randrange(0,10), randrange(*self.lifeSpanRange))
@@ -681,9 +683,9 @@ class WaterParticle(GraphicObject):
 			self.Y = self.Tank.Y - wl + self.Tank.Height - 5 + randrange(0, self.Radius)
 
 	def Draw(self, wn):
-		if not self.Active: return
-		pygame.draw.circle(wn, self.colour, (self.X, self.Y), 9)
-		pygame.draw.circle(wn, (150,150,150), (self.X, self.Y), 9, width = 1)
+		if self.Active:	
+			pygame.draw.circle(wn, self.colour, (self.X, self.Y), self.Radius)
+			pygame.draw.circle(wn, (150,150,150), (self.X, self.Y), self.Radius, width = 1)
 
 
 
