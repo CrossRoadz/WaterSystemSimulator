@@ -4,8 +4,8 @@ try:
 	import pygame
 except ImportError:
 	print("pygame Library needed to tun graphics.",
-		"To install pygame run the pip command (package installer for python, https://pypi.org/project/pip/) tool in your command prompt:",
-		"pip install pygame",
+		"To install pygame run the pip command (package installer for python) tool in your command prompt:",
+		"pip install pygame-ce", "or:", "py -m pip install pygame-ce",
 		sep = "\n")
 	input()
 pygame.init()
@@ -42,7 +42,8 @@ def main(WS):
 	wnWidth, wnHeight = WS.Bounds
 
 	if System.PARTICLES: 
-		print(WaterParticle.Particles, "Particles Loaded")
+		print("\n", WaterParticle.Particles, "Particles Loaded")
+	WS.TryLoadHistoricData()
 
 	wn = pygame.display.set_mode((wnWidth,wnHeight), pygame.RESIZABLE)
 	pygame.display.set_icon(pygame.image.load(path.join(Dir, "Data/Images/Icon.png")))
@@ -113,7 +114,7 @@ def main(WS):
 			selectedObj.Move(mouse_pos)
 
 		#simlation
-		if not Paused:
+		if not Paused and not System.done:
 			WS.Update(selectedObj.Exists)
 
 

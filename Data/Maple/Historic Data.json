@@ -1,0 +1,29 @@
+[
+  {
+    "Kind": "Sink",
+    "Label": "Sink",
+    "ProduceRates": [
+      -0.1,
+      -0.21666666666666667,
+      -0.23333333333333334,
+      -0.25,
+      -0.36666666666666664,
+      -0.15
+    ],
+    "WillRepeat": true,
+    "interval": 120,
+    "isRandom": true
+  },
+  {
+    "Kind": "Well",
+    "Label": "Well Cluster",
+    "ProduceRates": [
+      0.25,
+      0.2,
+      0.3
+    ],
+    "WillRepeat": true,
+    "interval": 6000,
+    "isRandom": true
+  }
+]

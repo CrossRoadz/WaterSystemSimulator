@@ -28,7 +28,7 @@ def main():
 	#add valves to pump (pump label, label, endSide = True, distance % = 0.5)
 	WS.MakeValve("Treatment Pump", "Treatment Valve", False)
 
-	#add relays to pumps and valves (controlled object label, label, num=0, isManual)
+	#add relays to pumps and valves (controlled object label, label, num=0, isManual=False)
 	WellPR = WS.MakeRelay("RW Pump", "Well Pump Relay")
 	TreatPR = WS.MakeRelay("Treatment Pump", "Treating Pump Relay")
 	TowerPR = WS.MakeRelay("Tower Pump", "Tower Pump Relay")
@@ -37,8 +37,12 @@ def main():
 	WS.MakeRelay("Tower Pump", "Tower Pump Relay manual", 1, True) #manual Switch
 	WS.MakeRelay("Treatment Valve", "TV Relay manual", 0, True) #manual Switch
 
+	#add indicators (x, y, label, (colourOff, colourOn) = (darkred, red))
+	SinksEmpty = WS.Add(Indicator(40,40,"Sinks Empty"))
+	PumpsDamaged = WS.Add(Indicator(140,40,"Pumps Damaged"))
+
 	#add floats to tanks (tank label,label, trigger threshold %, amplitude %, normally open)
-	WS.MakeFloat("Wells", "WELL HIGH", 0.5, 0.35)
+	WS.MakeFloat("Wells", "WELL HIGH", 0.5, 0.25)
 	WS.MakeFloat("Raw Water", "RW HIGH", 0.92, 0.04)
 	WS.MakeFloat("Raw Water", "RW LOW", 0.12, 0.04, False)
 	WS.MakeFloat("Clean Water", "CW HIGH", 0.92, 0.04)
@@ -63,6 +67,8 @@ def main():
 			self.Triggered = True
 		else:
 			self.Triggered = False
+	WellPR.Triggers = WellPR_Trigger.__get__(WellPR, Relay)
+
 	TreatPR.rwlf = WS.FindWithLabel("RW LOW", FloatSwitch)
 	TreatPR.cwhf = WS.FindWithLabel("CW HIGH", FloatSwitch)
 	def TreatPR_Trigger(self, System):
@@ -70,6 +76,7 @@ def main():
 			self.Triggered = True
 		else:
 			self.Triggered = False
+	TreatPR.Triggers = TreatPR_Trigger.__get__(TreatPR, Relay)
 		 
 	TowerPR.cwmf = WS.FindWithLabel("CW MID", FloatSwitch)
 	TowerPR.twhf = WS.FindWithLabel("TW HIGH", FloatSwitch)
@@ -78,6 +85,8 @@ def main():
 			self.Triggered = True
 		else:
 			self.Triggered = False
+	TowerPR.Triggers = TowerPR_Trigger.__get__(TowerPR, Relay)
+
 	HillSPR.twlf = WS.FindWithLabel("TW LOW", FloatSwitch)
 	HillSPR.hslf = WS.FindWithLabel("HS LOW", FloatSwitch)
 	def HillSPR_Trigger(self, System):
@@ -85,6 +94,9 @@ def main():
 			self.Triggered = True
 		else:
 			self.Triggered = False
+	HillSPR.Triggers = HillSPR_Trigger.__get__(HillSPR, Relay)
+
+
 	ValleySPR.cwlf = WS.FindWithLabel("CW LOW", FloatSwitch)
 	ValleySPR.vslf = WS.FindWithLabel("VS LOW", FloatSwitch)
 	def ValleySPR_Trigger(self, System):
@@ -92,15 +104,26 @@ def main():
 			self.Triggered = True
 		else:
 			self.Triggered = False
-
-
-
-	#set float logic
-	WellPR.Triggers = WellPR_Trigger.__get__(WellPR, Relay)
-	TreatPR.Triggers = TreatPR_Trigger.__get__(TreatPR, Relay)
-	TowerPR.Triggers = TowerPR_Trigger.__get__(TowerPR, Relay)
-	HillSPR.Triggers = HillSPR_Trigger.__get__(HillSPR, Relay)
 	ValleySPR.Triggers = ValleySPR_Trigger.__get__(ValleySPR, Relay)
+
+	#add indicator conditions
+	SinksEmpty.Sinks = WS.Sinks
+	def CheckCondition(self, system)-> bool:
+		for sink in self.Sinks:
+			if sink.Fill <= 0:
+				return True
+		return False
+	SinksEmpty.CheckCondition = CheckCondition.__get__(SinksEmpty, Indicator)
+
+	PumpsDamaged.Pumps = WS.Pumps
+	def CheckCondition(self, system)-> bool:
+		for pump in self.Pumps:
+			if pump.Damage > 0:
+				return True
+		return False
+	PumpsDamaged.CheckCondition = CheckCondition.__get__(PumpsDamaged, Indicator)
+
+
 
 	#set inital conditions
 	WS.SetTankFill("Clean Water", 3000)
@@ -108,6 +131,7 @@ def main():
 	#load saved positions
 	WS.LoadPositions()
 	#start simulation
+	#WS.MakeHistoricDataTemplate(False)
 	Simulate(WS)
 	
 

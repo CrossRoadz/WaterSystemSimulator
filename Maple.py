@@ -12,8 +12,7 @@ def main():
 	WS.Add(Tank(500,100, "Raw Water", 1000))
 	WS.Add(Well(50,150,"Well Cluster", 200, 0.25))
 	WS.Add(Tank(50,600, "Distrubtion Water", 3000))
-	WS.Add(Sink(700,600, "Sink", 150, 0.23))
-	WS.FindWithLabel("Sink").ConsumeRates = [6/60,13/60,14/60,15/60,22/60]
+	WS.Add(Sink(700,600, "Sink", 150, -0.23))
 
 
 	WS.SetTankFill("Distrubtion Water", 2300)
@@ -31,9 +30,11 @@ def main():
 	WS.MakeRelay("Well Pump", "Manual Relay", 1, True)
 	WS.MakeRelay("Treatment Valve", "Valve Manual Relay", 1, True)
 	#add indicators
-	SinkEmpty = WS.Add(Indicator(40, 40, ((100,0,0), (255,0,0)), "Sink Empty"))
+	SinkEmpty = WS.Add(Indicator(40, 40, "Sink Empty"))
+	Full3000 = WS.Add(Indicator(40,40,"3000 Full", ((0,75,0), (0,255,0)), False))
+	Full1000 = WS.Add(Indicator(40,40,"1000 Full", ((0,0,75), (100,150,255)), False))
 	#add floats
-	WS.MakeFloat("Well Cluster", "WC HIGH", 0.3, 0.1)
+	WS.MakeFloat("Well Cluster", "WC HIGH", 0.4, 0.1)
 	WS.MakeFloat("Raw Water", "RW HIGH", 0.92, 0.04)
 	WS.MakeFloat("Raw Water", "RW LOW", 0.12, 0.04)
 	WS.MakeFloat("Distrubtion Water", "DW HIGH", 0.92, 0.04)
@@ -92,10 +93,21 @@ def main():
 	DPR.Triggers = DPR_Trigger.__get__(DPR, Relay)
 
 	SinkEmpty.Sink = WS.FindWithLabel("Sink")
-	def SinkEmptyCondition(self, system):
+	def SinkEmptyCondition(self, system) -> bool:
 		if self.Sink.Fill <= 0:
-			self.Enabled = True
+			return True
+		return False
 	SinkEmpty.CheckCondition = SinkEmptyCondition.__get__(SinkEmpty, Indicator)
+
+	Full3000.dwhf = WS.FindWithLabel("DW HIGH")
+	def CheckCondition(self, system) -> bool:
+		return self.dwhf.Active
+	Full3000.CheckCondition = CheckCondition.__get__(Full3000, Indicator)
+
+	Full1000.rwhf = WS.FindWithLabel("RW HIGH")
+	def CheckCondition(self, system) -> bool:
+		return self.rwhf.Active
+	Full1000.CheckCondition = CheckCondition.__get__(Full1000, Indicator)
 
 	WS.LoadPositions()
 	Simulate(WS)

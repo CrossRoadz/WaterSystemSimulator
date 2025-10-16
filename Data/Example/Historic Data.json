@@ -1,0 +1,45 @@
+[
+  {
+    "Kind": "Sink",
+    "Label": "Hill Sink",
+    "ProduceRates": [
+      -0.9,
+      -1.1
+    ],
+    "WillRepeat": true,
+    "interval": 120,
+    "isRandom": true
+  },
+  {
+    "Kind": "Sink",
+    "Label": "Valley Sink",
+    "ProduceRates": [
+      -0.1,
+      0,
+      -0.1,
+      -0.75,
+      -1.25,
+      -1.5,
+      -2.5,
+      -1
+    ],
+    "WillRepeat": true,
+    "interval": 180,
+    "isRandom": false
+  },
+  {
+    "Kind": "Well",
+    "Label": "Wells",
+    "ProduceRates": [
+      2,
+      1,
+      2.5,
+      1,
+      5,
+      1
+    ],
+    "WillRepeat": true,
+    "interval": 900,
+    "isRandom": true
+  }
+]

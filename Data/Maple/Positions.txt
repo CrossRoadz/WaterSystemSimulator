@@ -1,0 +1,25 @@
+500;100;Raw Water;GraphicTypes.Tank
+50;150;Well Cluster;GraphicTypes.Well
+50;600;Distrubtion Water;GraphicTypes.Tank
+700;600;Sink;GraphicTypes.Sink
+275;125;Well Pump;GraphicTypes.Pump
+275;350;Treating Pump;GraphicTypes.Pump
+375;600;DW Pump;GraphicTypes.Pump
+218;412;Treatment Valve;GraphicTypes.Valve
+297;146;Well Pump Relay;GraphicTypes.Relay
+297;371;Treating Pump Relay;GraphicTypes.Relay
+397;621;DW Pump Relay;GraphicTypes.Relay
+240;433;TV Relay;GraphicTypes.Relay
+319;146;Manual Relay;GraphicTypes.Relay
+262;433;Valve Manual Relay;GraphicTypes.Relay
+738;506;Sink Empty;GraphicTypes.Indicator
+676;414;3000 Full;GraphicTypes.Indicator
+738;414;1000 Full;GraphicTypes.Indicator
+167;184;WC HIGH;GraphicTypes.Float
+700;108;RW HIGH;GraphicTypes.Float
+700;188;RW LOW;GraphicTypes.Float
+337;611;DW HIGH;GraphicTypes.Float
+337;725;DW LOW;GraphicTypes.Float
+806;626;SINK LOW;GraphicTypes.Float
+150;300;Treatment;GraphicTypes.Box
+217;70;Pump House;GraphicTypes.Box

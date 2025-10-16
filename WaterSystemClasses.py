@@ -1,6 +1,7 @@
 from enum import Enum
 from random import randrange
 import pygame
+import json
 from os import path, makedirs
 pygame.font.init()
 
@@ -19,6 +20,14 @@ class GraphicTypes(Enum):
 	Particle = "Particle"
 	Indicator = "Indicator"
 
+def MakeDir(Dir):
+	if not path.exists(Dir):
+		makedirs(Dir)
+		print("Made folder", Dir)
+		return True
+	return False
+
+
 #main class
 class System():
 	ZIG = False
@@ -27,7 +36,7 @@ class System():
 	TEXT_GAP = 10 * VISUAL_SCALE
 	TICK_RATE = 60
 	#time sclae of 1 = 3600x speed
-	TimeScale = 1/TICK_RATE*2
+	TimeScale = 1/TICK_RATE*2 #1s == 2m pass
 	FontSizeLarge = int(20 * VISUAL_SCALE)
 	FontSizeSmall = int(15 * VISUAL_SCALE)
 	TextFontLarge = pygame.font.SysFont("arialblack", FontSizeLarge)
@@ -43,6 +52,8 @@ class System():
 	HELP_IMAGE_XGAP = 0
 	for image in HELP_IMAGES:
 		HELP_IMAGE_XGAP = max(HELP_IMAGE_XGAP, image.get_width())
+	OverSpeedWarningSent = False
+	done = False # will stop all sims if True
 
 	def __init__(self, bounds, title: str = "No Title"):
 		self.Bounds = bounds
@@ -63,7 +74,8 @@ class System():
 		self.MinutesPassed = 0
 		self.ShowHelp = False
 		self.FirstRun = True
-		self.updateTimeImage()		
+		self.updateTimeImage()
+		MakeDir(self.Dir)
 
 	def updateTimeImage(self):
 		#bottom text
@@ -74,21 +86,91 @@ class System():
 		elif self.MinutesPassed <= 3600:
 			RealTimePassed = f"{self.MinutesPassed / 60:.1f}hours"
 		else:
-			RealTimePassed = f"{self.MinutesPassed / 3600:.1f}days"
+			RealTimePassed = f"{self.MinutesPassed / 1440:.1f}days"
 
 
 		self.TimeImage = System.TextFontLarge.render(f"{self.TimeRunning}t, {RealTimePassed}, {1/(timeFactor):.2f}s passes for each min (x{timeFactor * System.TICK_RATE:.1f} Speed)", True, (0,0,0))
 
 	def SavePositions(self):
 		#saves positions (ctrl+s),stored in Positions.txt under here/data/title
-		if not path.exists(self.Dir):
-			makedirs(self.Dir)
-			print("Made folder", self.Dir)
 
 		with open(path.join(self.Dir, "Positions.txt"), 'w') as f:
 			for obj in self.AllObjects:
 				f.write(f"{obj}\n")
-			print("Saved")
+			print("Saved positions")
+
+	def writeHistoicData(self, mode):
+		with open(path.join(self.Dir, "Historic Data.json"), mode) as f:
+			data = []
+			for sink in self.Sinks:
+				data.append(sink.ToJson())
+			for well in self.Wells:
+				data.append(well.ToJson())
+			f.write(json.dumps(data, indent=2, sort_keys=True))
+
+	def MakeHistoricDataTemplate(self, YouAreDoneDesign: bool=False):
+		if not YouAreDoneDesign: 
+			print("Ensure you are done your design, this will override any manually imported data")
+			return
+		self.writeHistoicData('w')
+		print("!Reset Historic Data!")
+
+	def TryLoadHistoricData(self):
+		try:
+			self.writeHistoicData('x')
+			print("Made Baseline Historic Data Template",
+				" Call 'WS.MakeHistoricDataTemplate(True)' if you'd wish to reset template", sep="\n")
+		except FileExistsError:
+			print("Well and Sink historic data found")
+
+		with open(path.join(self.Dir, "Historic Data.json"), 'r') as f:
+			data = json.loads(f.read())
+			for item in data:
+				obj = self.FindWithLabel(item["Label"])
+				if not obj:
+					print("Label in historic json not found")
+					continue
+				obj.ProduceRates = item["ProduceRates"]
+				obj.SetInterval(item["interval"])
+				obj.isRandom = item["isRandom"]
+				if obj.isRandom:
+					obj.Randomize()
+				else:
+					obj.ProduceRate = obj.ProduceRates[0]
+				obj.RateChange()
+				obj.WillRepeat  = item["WillRepeat"]
+
+
+	def TryLoadHistoricData2(self):
+		#make data files if they don't exist
+		try:
+			with open(path.join(self.Dir, "Sink Data.json"), 'x') as f:
+				data = [{"Label": sink.Label,
+				 "ConsumeRates": sink.ConsumeRates,
+				 "TimeUntilNextValue": 30} for sink in self.Sinks]
+				f.write(json.dumps(data, indent=2, sort_keys=True))
+			with open(path.join(self.Dir, "Well Data.json"), 'x') as f:
+				data = [{"Label": well.Label, "ConsumeRates": well.GenerateRates} for well in self.Wells]
+				f.write(json.dumps(data, indent=2, sort_keys=True))
+		except FileExistsError:
+			print("Well and Sink historic data found")
+
+
+
+		with open(path.join(self.Dir, "Sink Data.json"), 'r') as f:
+			data = json.loads(f.read())
+			for item in data:
+				sink = self.FindWithLabel(item["Label"])
+				sink.ConsumeRates = item["ConsumeRates"]
+
+		with open(path.join(self.Dir, "Well Data.json"), 'r') as f:
+			data = json.loads(f.read())
+			for item in data:
+				well = self.FindWithLabel(item["Label"])
+				well.ConsumeRates = item["ConsumeRates"]
+
+
+
 
 	def LoadPositions(self):
 		#loads object positions from Positions.txt under here/data/title
@@ -255,12 +337,10 @@ class System():
 				obj.Update()
 
 		#simulation system
-		for well in self.Wells:
-			well.Generate()
-
-		for sink in self.Sinks:
-			sink.Consume()
-			sink.Randomize()
+		for source in self.Wells + self.Sinks:
+			source.Produce()
+			source.Randomize()
+			source.CheckNextRate(self.MinutesPassed)
 
 		for floatswitch in self.Floats:
 			floatswitch.Evaluate()
@@ -282,7 +362,11 @@ class System():
 					particle.Update()
 
 		for indicator in self.Indicators:
-			indicator.CheckCondition(self)
+			if indicator.CheckCondition(self):
+				indicator.TimeStamp = self.MinutesPassed
+				indicator.Enabled = True
+			elif not indicator.StayOn:
+				indicator.Enabled = False
 
 
 
@@ -290,6 +374,7 @@ class System():
 class GraphicObject():
 	#object that will be drawn
 	grey = (125,125,125)
+	dark_grey = (80,80,80)
 
 	def __init__(self, x: int, y: int, label: str, kind):
 		self.X, self.Y = x,y
@@ -298,25 +383,49 @@ class GraphicObject():
 		self.Width = 50
 		self.Height = 50
 
+		self.Damage = 0
+		self.Health = 250
+		self.DamageUnit = 1 / System.TimeScale
+		self.DamageCap = 0
+
 		if kind in (GraphicTypes.Tank, GraphicTypes.Sink, GraphicTypes.Well):
 			self.ImageLabel = System.TextFontLarge.render(self.Label, True, (0,0,0))
 		elif kind in (GraphicTypes.Pump, GraphicTypes.Valve, GraphicTypes.Indicator):
-			self.ImageLabel = System.TextFontSmall.render(self.Label, True, (100,100,100))
+			self.ImageLabel = System.TextFontSmall.render(self.Label, True, GraphicObject.dark_grey)
 
 	def __str__(self):
 		return f"{self.X};{self.Y};{self.Label};{self.Kind}"
 
+	@property
+	def DamageScale(self):
+		return self.Health / (self.Health + self.Damage)
+
+	def DoDamage(self, amount = 0):
+		#applies damage
+		#if damage if over a cap, ignore
+		if self.DamageCap and self.DamageCap < self.Damage:
+			return
+		#custom damage
+		if amount:
+			self.Damage += amount * System.TimeScale
+			return
+
+		self.Damage += self.DamageUnit * System.TimeScale
+
+	def GetScaledChance(self, chance)->int:
+		return int(chance / System.TICK_RATE * 2 / System.TimeScale) + 1
+
+
 	def Draw(self, wn):
 		#drawn graphic based on .Kind
-		
-
 		if self.Kind in (GraphicTypes.Tank, GraphicTypes.Well, GraphicTypes.Sink):
 			
 			wn.blit(self.ImageLabel, (self.X, self.Y - System.FontSizeLarge - System.TEXT_GAP))
 
 			WaterLevel = int(self.Height * (self.Fill / self.Size))
 			pygame.draw.rect(wn, (150,150,255), (self.X, self.Y+(self.Height - WaterLevel), self.Width, WaterLevel))
-			pygame.draw.rect(wn, (0,0,0), (self.X, self.Y, self.Width, self.Height), width = 3)
+			colour = (0,0,0) if not self.Damage else (200,0,0)
+			pygame.draw.rect(wn, colour, (self.X, self.Y, self.Width, self.Height), width = 3)
 
 			for particle in self.Particles:
 				particle.Draw(wn)
@@ -366,6 +475,10 @@ class Tank(GraphicObject):
 	def Size(self):
 		return self._Size
 
+	def ClampFill(self):
+		#ensure water doesnt over/under flow
+		self.Fill = Clamp(self.Fill, self.Size)
+
 	def GetChange(self):
 		#change in volume (dV)
 		self.dV = (self.Fill - self.LastFill) / System.TimeScale
@@ -390,25 +503,29 @@ class Pump(GraphicObject):
 		self.Enabled = True
 		self.Radius = 25 * System.VISUAL_SCALE
 		self.Rect = pygame.Rect(x - self.Radius,y - self.Radius,self.Radius*2 ,self.Radius*2)
-		self.Damage = 0
-		self.Health = 100
 
 	@property
 	def MaxFlowRate(self):
 		return self._MaxFlowRate
 
 	def PumpWater(self):
+		#pumps water from source tank to end tank
 		if (not self.Enabled): return
 
 
-		flow = self.FlowRate * System.TimeScale * (self.Health / (self.Health + self.Damage))
+		flow = self.FlowRate * System.TimeScale * self.DamageScale
+		#if flow is too large, it will bypass floast and damage itself
+		#this is a bug which I plan to fix
+		if not System.OverSpeedWarningSent and flow / self.Source.Size > 0.1:
+			print("Sim running over speed, pumps may damage themselves as a bug")
+			System.OverSpeedWarningSent = True
 		self.Source.Fill -= flow
 
 		#prevent negative fill
 		if (self.Source.Fill < 0):
 			flow += self.Source.Fill
 			self.Source.Fill = 0
-			self.Damage += 1
+			self.DoDamage()
 		self.End.Fill += flow
 
 		#prevent overfill
@@ -416,7 +533,7 @@ class Pump(GraphicObject):
 		if overfill < 0:
 			self.End.Fill += overfill
 			self.Source.Fill -= overfill
-			self.Damage += 1
+			self.DoDamage()
 
 	def Update(self):
 		self.Rect = pygame.Rect(self.X - self.Radius,self.Y - self.Radius,self.Radius*2 ,self.Radius*2)
@@ -427,47 +544,131 @@ class Pump(GraphicObject):
 		pygame.draw.circle(wn, GraphicObject.grey, (self.X, self.Y), 5)
 		pygame.draw.line(wn, GraphicObject.grey, (self.X, self.Y), self.Source.OutputPoint, width = 4)
 		pygame.draw.line(wn, GraphicObject.grey, (self.X, self.Y), self.End.InputPoint, width = 4)
-		if self.Damage:
-			colour = (200,0,0)
-		else:
-			colour = (0,0,0)
+		
+		colour = (200,0,0) if self.Damage else (0,0,0)
 		pygame.draw.circle(wn, colour, (self.X, self.Y), self.Radius, width = 3)
 
+class Source(Tank):
+	#generates or consumes water
 
-class Sink(Tank):
-	#constant water drain
-	def __init__(self, x, y, label, size, consumeRate):
-		super(Sink, self).__init__(x, y, label, size, GraphicTypes.Sink)
-		self.ConsumeRate = consumeRate
-		self.ConsumeRates = [consumeRate*0.9,consumeRate*1.1]
-		self.RateChangeChance = 100
-		self.RateImage = System.TextFontSmall.render(f"-{self.ConsumeRate:.2f}gal/min", True, (0,0,0))
-		self.NoWaterTime = 0
+	def __init__(self, x, y, label, size, kind, rate, interval=120, isRandom = True):
+		super(Source, self).__init__(x, y, label, size, kind)
+		self.ProduceRate = rate
+		self.EffectiveRate = rate
+		self.ProduceRates = [rate]
+		self.SetInterval(interval)
+		self.isRandom = isRandom
+		self.index = 0
+		self.WillRepeat = True
+		self.HealChance = 30
+		self.RateChange()
 
-	def Consume(self):
-		self.Fill -= self.ConsumeRate * System.TimeScale
-		if self.Fill <= 0: 
-			self.NoWaterTime += 1
-		self.Fill = max(self.Fill,0)
+	def SetInterval(self, value):
+		#flow rate change intervals
+		self.interval = value
+		self.intervalInc = value
+	
+	def RateChange(self):
+		#update the flow rate text
+		self.RateImage = System.TextFontSmall.render(f"{self.EffectiveRate:.2f}gal/min", True, (0,0,0))
+
+	def TryHeal(self):
+		#try to recover damage
+		if self.Damage and not randrange(0, self.GetScaledChance(self.HealChance)):
+			self.Damage -= self.DamageUnit * System.TimeScale
+			self.Damage = max(self.Damage, 0)
+			self.RateChange()
+
+	def Produce(self):
+		#should be overridden by child
+		self.EffectiveRate = self.ProduceRate*self.DamageScale
+		self.Fill += self.EffectiveRate * System.TimeScale
+		if not 0 < self.Fill < self.Size:
+			self.ClampFill()
 
 	def Randomize(self):
-		#sim random water usage
-		if randrange(0, self.RateChangeChance) == 0:
-			self.ConsumeRate = self.ConsumeRates[randrange(0, len(self.ConsumeRates)-1)]
-			self.RateImage = System.TextFontSmall.render(f"-{self.ConsumeRate:.2f}gal/min", True, (0,0,0))
+		#pick new random rate
+		if not self.isRandom: return
+		#scales with sim speed, more likely at faster speeds
+		if not randrange(0, self.GetScaledChance(self.interval)):
+			self.ProduceRate = self.ProduceRates[randrange(0, len(self.ProduceRates))]
+			self.RateChange()
 
-class Well(Tank):
+	def CheckNextRate(self, minutesPassed):
+		#if not random mode, increment through list of flow rates
+		if self.isRandom: return
+
+		if self.interval < minutesPassed:
+			self.interval += self.intervalInc
+			self.index += 1
+			if self.index >= len(self.ProduceRates):
+				self.index = 0
+				#if not repeat the list, will stop simulation
+				if not self.WillRepeat:
+					System.done = True
+			self.ProduceRate = self.ProduceRates[self.index]
+			self.RateChange()
+
+
+	def ToJson(self):
+		#for use in file saving, returns dict for json
+		return {"Label": self.Label,
+				"Kind": self.Kind.value,
+				"interval": self.interval,
+				"isRandom": self.isRandom,
+				"ProduceRates": self.ProduceRates,
+				"WillRepeat": self.WillRepeat}
+
+
+class Sink(Source):
+	#constant water drain
+	def __init__(self, x, y, label, size, consumeRate):
+		rate = -abs(consumeRate)
+		super(Sink, self).__init__(x, y, label, size, GraphicTypes.Sink, rate)
+		self.ProduceRates = [0.9*rate, 1.1*rate]
+		self.HealChance = 10
+		self.DamageCap = self.Health * 3
+	def Produce(self):
+		#consume water from its own tank
+		self.EffectiveRate = self.ProduceRate/self.DamageScale
+
+		self.Fill += self.EffectiveRate * System.TimeScale
+		self.ClampFill()
+
+		#damage self if left empty
+		#acts as if people will consume more water after losing water
+		if self.Fill <= 0.01:
+			self.DoDamage()
+			self.RateChange()
+		else:
+			self.TryHeal()
+		
+
+class Well(Source):
 	#water generator
 	def __init__(self, x, y, label, size, generateRate):
-		super(Well, self).__init__(x, y, label, size, GraphicTypes.Well)
-		self.GenerateRate = generateRate
+		super(Well, self).__init__(x, y, label, size, GraphicTypes.Well, abs(generateRate))
 		self.Fill = self.Size *0.85
+		self.DamageUnit /= 2
+		self.HealChance = 30
+		self.DamageCap = self.Health * 6
 
-		self.RateImage = System.TextFontSmall.render(f"{generateRate:.2f}gal/min", True, (0,0,0))
+	def Produce(self):
+		#generate water to its own tank
+		self.EffectiveRate = self.ProduceRate*self.DamageScale
 
-	def Generate(self):
-		self.Fill += self.GenerateRate * System.TimeScale
-		self.Fill = min(self.Fill, self.Size)
+		self.Fill += self.EffectiveRate * System.TimeScale
+		self.ClampFill()
+
+		percentFilled = self.Fill / self.Size
+		if percentFilled < 0.1:
+			self.DoDamage()
+			self.RateChange()
+		elif percentFilled < 0.2:
+			self.DoDamage(self.DamageUnit/4)
+			self.RateChange()
+		else:
+			self.TryHeal()
 
 class Relay(GraphicObject):
 	"""logic controller / manual switch
@@ -611,10 +812,13 @@ class Valve(GraphicObject):
 		pygame.draw.circle(wn, (0,0,0), (self.X, self.Y), self.Radius, 2)
 
 class Indicator(GraphicObject):
-	def __init__ (self, x, y, colours, label):
+	def __init__ (self, x, y, label, colours = ((100,0,0), (255,0,00)), stayOn = True):
 		super(Indicator, self).__init__(x, y, label, GraphicTypes.Indicator)
 		self.ColourOff, self.ColourOn = colours
 		self.Radius = 15
+		self.StayOn = stayOn
+		self.TimeStamp = 0
+		self.TimeImage = None
 		self.Enabled = False
 		self.Update()
 
@@ -622,16 +826,29 @@ class Indicator(GraphicObject):
 		self.Rect = pygame.Rect(self.X - self.Radius,self.Y - self.Radius,self.Radius*2 ,self.Radius*2)
 
 	def CheckCondition(self, system):
-		pass
+		return False
 
 	def Draw(self, wn):
+		#show time when indicator condition was met
+		if self.TimeImage:
+			x_offset = self.X - self.TimeImage.get_width()//2 
+			y_offset = self.Y - self.TimeImage.get_height() - self.Radius - System.TEXT_GAP
+			wn.blit(self.TimeImage, (x_offset, y_offset))
+		#render time image if not already made and if indicator will stay on
+		elif not self.TimeImage and self.TimeStamp and self.StayOn:
+			days = int(self.TimeStamp) // 1440
+			hours = int(self.TimeStamp % 1440) // 60
+			mins = (self.TimeStamp % 60)
+			timeText = f"@ {days}D {hours}h {mins:.1f}m"
+			self.TimeImage = System.TextFontSmall.render(timeText, True, GraphicObject.dark_grey)
+
 		wn.blit(self.ImageLabel, (self.X - self.ImageLabel.get_width()//2, self.Y + self.Radius + System.TEXT_GAP))
 		pygame.draw.rect(wn, (200,200,200), (self.X-3-self.Radius, self.Y-3-self.Radius, self.Radius*2+6, self.Radius*2+6))
 		pygame.draw.rect(wn, (50,50,50), (self.X-3-self.Radius, self.Y-3-self.Radius, self.Radius*2+6, self.Radius*2+6), width = 2)
 		colour = self.ColourOn if self.Enabled else self.ColourOff
 		pygame.draw.circle(wn, colour, (self.X, self.Y), self.Radius)
 		pygame.draw.circle(wn, (0,0,0), (self.X, self.Y), self.Radius, 2)
-		pygame.draw.circle(wn, (50,50,50), (self.X, self.Y), self.Radius//2, 1)
+		pygame.draw.circle(wn, (50,50,50), (self.X, self.Y), self.Radius*2//3, 1)
 
 
 
@@ -659,27 +876,29 @@ class WaterParticle(GraphicObject):
 
 	@staticmethod
 	def getColour():
-		brigthness = randrange(215,235)
+		brigthness = randrange(215,236)
 		return (brigthness, brigthness, 255)
 	def Update(self):
 		greatFlow = int(abs(self.Tank.dV)) > 0 # enough flow to trigger particles, >=1gal/min
+		#hide particle if low flowrate in tank
 		if greatFlow:
 			self.Active = True
 		elif self.Active and not randrange(0,self.decayChance):
 			self.Active = False
 			self.LifeSpan = CappedNumber(0, randrange(*self.lifeSpanRange))
 
-
+		#simulate gravity
 		if self.LifeSpan.isLess():
 			self.vy = min(self.vy + self.g, self.maxSpd)
 			self.Y = min(self.Y + int(self.vy), self.Tank.Y + self.Tank.Height - self.Radius)
 			self.LifeSpan.value += 1
+		#reset
 		elif not self.LifeSpan.isLess() and self.Active:
 			self.vy = self.startingV
 			self.colour = WaterParticle.getColour()
 			self.LifeSpan = CappedNumber(0, randrange(*self.lifeSpanRange))
 			wl = int(self.Tank.Height * (self.Tank.Fill / self.Tank.Size) )
-			self.X = self.Tank.X + randrange(self.Radius, self.Tank.Width - self.Radius)
+			self.X = self.Tank.X + randrange(self.Radius, self.Tank.Width - self.Radius+1)
 			self.Y = self.Tank.Y - wl + self.Tank.Height - 5 + randrange(0, self.Radius)
 
 	def Draw(self, wn):
@@ -691,7 +910,7 @@ class WaterParticle(GraphicObject):
 
 class ToggleFunc:
 	#switch with hysteresis (deadband) from +/- Amplitude of threshold
-	#all in %
+	#all in %, GreaterThan also means normally open
 	def __init__(self, Threshold, Amplitude, GreaterThan = True):
 		self.Threshold = Threshold
 		self.ThresholdTest = Threshold + Amplitude
@@ -728,20 +947,11 @@ class CappedNumber():
 	def isLess(self):
 		return self.value < self._max
 
-
+def Clamp(value, max_value, min_value=0):
+	return min(max(min_value, value),max_value)
 
 if __name__ == "__main__":
-	num = .4
-	tf = ToggleFunc(0.5,0.04, False)
-
-	for i in range(100):
-		num+=0.01
-		tf.Evaluate(num)
-		print(tf.Active, num)
-
-		if i >= 50:
-			num-=0.02
-
+	
 
 
 	pygame.font.quit()

@@ -17,16 +17,17 @@ def main():
 
 	#add valves to pumps (pump label, label, endSide = True, distance % = 0.5)
 
-	#add relays to pumps or valves (controlled object label, label, num=0, isManual)
+	#add relays to pumps or valves (controlled object label, label, num=0, isManual= False)
+
+	#add indicators (x, y, label, (colourOff, colourOn) = (darkred, red))
 
 	#add floats to tanks (tank label,label, trigger threshold %, amplitude %, normally open)
 
 	#last for gui, add any boxes (x, y, w, h, label)
 
-	#make float logic
+	#add relay logic
 
-
-	#set float logic
+	#add indicator conditions
 
 	#set inital conditions
 
