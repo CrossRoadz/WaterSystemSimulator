@@ -10,7 +10,7 @@ def main():
 	WS = System((1150, 850), "Maple")
 		
 	WS.Add(Tank(500,100, "Raw Water", 1000))
-	WS.Add(Well(50,150,"Well Cluster", 200, 0.25))
+	WS.Add(Well(50,150,"Well Cluster", 250, 0.25))
 	WS.Add(Tank(50,600, "Distrubtion Water", 3000))
 	WS.Add(Sink(700,600, "Sink", 150, -0.23))
 
@@ -110,6 +110,7 @@ def main():
 	Full1000.CheckCondition = CheckCondition.__get__(Full1000, Indicator)
 
 	WS.LoadPositions()
+	WS.AutoRun = False
 	Simulate(WS)
 	
 

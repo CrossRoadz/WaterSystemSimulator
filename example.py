@@ -132,6 +132,7 @@ def main():
 	WS.LoadPositions()
 	#start simulation
 	#WS.MakeHistoricDataTemplate(False)
+	WS.AutoRun = False
 	Simulate(WS)
 	
 

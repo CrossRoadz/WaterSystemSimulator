@@ -41,9 +41,10 @@ def main(WS):
 	#starting res
 	wnWidth, wnHeight = WS.Bounds
 
+
+
 	if System.PARTICLES: 
 		print("\n", WaterParticle.Particles, "Particles Loaded")
-	WS.TryLoadHistoricData()
 
 	wn = pygame.display.set_mode((wnWidth,wnHeight), pygame.RESIZABLE)
 	pygame.display.set_icon(pygame.image.load(path.join(Dir, "Data/Images/Icon.png")))
@@ -119,6 +120,24 @@ def main(WS):
 
 
 
+
 def Simulate(WS):
-	main(WS)
+	WS.TryLoadHistoricData()
+
+	selection = '1'
+	if not WS.AutoRun:
+		selection = input("\n\nEnter Selected Option\n 1. Run Graphic Sim\n 2. Run Quick Sim\n 3. Reset Histroic Data\n>")
+		if selection == '2':
+			WS.QuickSim()
+		elif selection == '3':
+			selection = input(f"This will  reset the Histroic Data.json file in {WS.title}, are you sure?\n[y,n]>")[0].lower()
+			if selection == 'y': WS.MakeHistoricDataTemplate(True)
+		elif selection == '1':
+			print("Starting Sim in new window")
+		else:
+			input("Input invalid, please restart")
+			
+	if selection == '1':
+		main(WS)
 	pygame.quit()
+

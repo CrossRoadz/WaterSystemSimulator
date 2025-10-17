@@ -27,6 +27,26 @@ def MakeDir(Dir):
 		return True
 	return False
 
+def Average(numList):
+	#returns mean
+	return sum(numList) / len(numList)
+
+def Variance(numList, average = 0):
+	#return variance
+	if not average:
+		average = Average(numList)
+	var = 0
+	for num in numList:
+		var += (num - average) ** 2
+	return var
+
+def MinsToDHM(minutes)->str:
+	#return time string
+	days = int(minutes) // 1440
+	hours = int(minutes % 1440) // 60
+	mins = (minutes % 60)
+	return f"@ {days}D {hours}h {mins:.1f}m"
+
 
 #main class
 class System():
@@ -35,6 +55,9 @@ class System():
 	VISUAL_SCALE = 1
 	TEXT_GAP = 10 * VISUAL_SCALE
 	TICK_RATE = 60
+	V_UNIT = 'gal'
+	T_UNIT = 'min'
+	F_UNIT = f"{V_UNIT}/{T_UNIT}"
 	#time sclae of 1 = 3600x speed
 	TimeScale = 1/TICK_RATE*2 #1s == 2m pass
 	FontSizeLarge = int(20 * VISUAL_SCALE)
@@ -91,6 +114,68 @@ class System():
 
 		self.TimeImage = System.TextFontLarge.render(f"{self.TimeRunning}t, {RealTimePassed}, {1/(timeFactor):.2f}s passes for each min (x{timeFactor * System.TICK_RATE:.1f} Speed)", True, (0,0,0))
 
+	def QuickSim(self):
+		print("\nRuning longterm quick sim\n")
+		totalWellProduction = 0
+		totalSinkProduction = 0
+		smallestAvgProduction = 0
+		largestAvgConsumation = 0
+
+
+		for well in self.Wells:
+			totalWellProduction += Average(well.ProduceRates)
+			smallestAvgProduction += min(well.ProduceRates) * well.interval
+
+		for sink in self.Sinks:
+			totalSinkProduction += Average(sink.ProduceRates)
+			largestAvgConsumation += min(sink.ProduceRates) * sink.interval
+
+		wellVariance = []
+		for well in self.Wells:
+			wellVariance.append(round(Variance(well.ProduceRates), 3))
+		sinkVariance = []
+		for sink in self.Sinks:
+			sinkVariance.append(round(Variance(sink.ProduceRates), 3))
+		wellDeviation = [round(var**0.5, 2) for var in wellVariance]
+		sinkDeviation = [round(var**0.5, 2) for var in sinkVariance]
+
+		stable = totalWellProduction + totalSinkProduction >= 0
+
+		totalSystemStorage = 0
+		for tank in self.Tanks + self.Sinks + self.Wells:
+			totalSystemStorage += tank.Size
+
+		if not stable:
+			timeTilEmpty = totalSystemStorage/2 / (totalWellProduction + totalSinkProduction)
+		else:
+			timeTilEmpty = totalSystemStorage/2 / (smallestAvgProduction + largestAvgConsumation)
+		
+
+		print(f"is Water System Stable? (well >= sink): {stable}",
+			  f"avg Well Production: {totalWellProduction:.3f}{System.F_UNIT}",
+			  f"avg Sink Conumation: {totalSinkProduction:.3f}{System.F_UNIT}",
+			  f"Well Variance: {wellVariance}",
+			  f"Sink Variance: {sinkVariance}",
+			  f"Well Deviation: {wellDeviation}",
+			  f"Sink Deviation: {sinkDeviation}",
+			  f"System Water Storage: {totalSystemStorage}{System.V_UNIT}",
+			  sep = '\n')
+		print("Greater Deviations can require more storage\n\nin Summary:\n")
+
+
+		if not stable:
+			print("System is NOT stable, sinkswill go empty")
+			print(f"Estimated Time until sinks are empty: {MinsToDHM(-timeTilEmpty)}")
+		else:
+			print("System is Stable!")
+			if timeTilEmpty < 0:
+				print(f"During a worst case senario, sinks can become empty in: {MinsToDHM(-timeTilEmpty)}",
+					"-More Storage recommended", sep='\n')
+			else:
+				print("Storage should buffer most worst case senarios!")
+
+
+
 	def SavePositions(self):
 		#saves positions (ctrl+s),stored in Positions.txt under here/data/title
 
@@ -139,35 +224,6 @@ class System():
 					obj.ProduceRate = obj.ProduceRates[0]
 				obj.RateChange()
 				obj.WillRepeat  = item["WillRepeat"]
-
-
-	def TryLoadHistoricData2(self):
-		#make data files if they don't exist
-		try:
-			with open(path.join(self.Dir, "Sink Data.json"), 'x') as f:
-				data = [{"Label": sink.Label,
-				 "ConsumeRates": sink.ConsumeRates,
-				 "TimeUntilNextValue": 30} for sink in self.Sinks]
-				f.write(json.dumps(data, indent=2, sort_keys=True))
-			with open(path.join(self.Dir, "Well Data.json"), 'x') as f:
-				data = [{"Label": well.Label, "ConsumeRates": well.GenerateRates} for well in self.Wells]
-				f.write(json.dumps(data, indent=2, sort_keys=True))
-		except FileExistsError:
-			print("Well and Sink historic data found")
-
-
-
-		with open(path.join(self.Dir, "Sink Data.json"), 'r') as f:
-			data = json.loads(f.read())
-			for item in data:
-				sink = self.FindWithLabel(item["Label"])
-				sink.ConsumeRates = item["ConsumeRates"]
-
-		with open(path.join(self.Dir, "Well Data.json"), 'r') as f:
-			data = json.loads(f.read())
-			for item in data:
-				well = self.FindWithLabel(item["Label"])
-				well.ConsumeRates = item["ConsumeRates"]
 
 
 
@@ -294,12 +350,12 @@ class System():
 		#adjust fill by 10% with mouse interaction
 		if not isinstance(obj, Tank): return
 		if add:
-			print(f"Adding {obj.Size/10:.1f}gal Water to",obj.Label)
+			print(f"Adding {obj.Size/10:.1f}{System.V_UNIT} Water to",obj.Label)
 			obj.Fill += obj.Size/10
 			obj.Fill = min(obj.Size, obj.Fill)
 			return
 		
-		print(f"Removing {obj.Size/10:.1f}gal Water from",obj.Label)
+		print(f"Removing {obj.Size/10:.1f}{System.V_UNIT} Water from",obj.Label)
 		obj.Fill -= obj.Size/10
 		obj.Fill = max(0, obj.Fill)
 
@@ -465,7 +521,7 @@ class Tank(GraphicObject):
 		self.InputPoint = (self.X, self.Y)
 		self.OutputPoint = (self.X + self.Width, self.Y + self.Height)
 		#for small text
-		self.FillImage = System.TextFontSmall.render(f"{int(self.Fill)}gal, 0gal/min", True, (0,0,0))
+		self.FillImage = System.TextFontSmall.render(f"{int(self.Fill)}{System.V_UNIT}, 0{System.F_UNIT}", True, (0,0,0))
 		
 		pnum = self.Width // WaterParticle.Radius #adds particles bades on width
 		if not System.PARTICLES: pnum = 0
@@ -482,7 +538,7 @@ class Tank(GraphicObject):
 	def GetChange(self):
 		#change in volume (dV)
 		self.dV = (self.Fill - self.LastFill) / System.TimeScale
-		self.FillImage = System.TextFontSmall.render(f"{int(self.Fill)}gal, {self.dV:.1f}gal/min", True, (0,0,0))
+		self.FillImage = System.TextFontSmall.render(f"{int(self.Fill)}{System.V_UNIT}, {self.dV:.1f}{System.F_UNIT}", True, (0,0,0))
 		self.LastFill = self.Fill
 
 	def Update(self):
@@ -570,7 +626,7 @@ class Source(Tank):
 	
 	def RateChange(self):
 		#update the flow rate text
-		self.RateImage = System.TextFontSmall.render(f"{self.EffectiveRate:.2f}gal/min", True, (0,0,0))
+		self.RateImage = System.TextFontSmall.render(f"{self.EffectiveRate:.2f}{System.F_UNIT}", True, (0,0,0))
 
 	def TryHeal(self):
 		#try to recover damage
@@ -836,10 +892,7 @@ class Indicator(GraphicObject):
 			wn.blit(self.TimeImage, (x_offset, y_offset))
 		#render time image if not already made and if indicator will stay on
 		elif not self.TimeImage and self.TimeStamp and self.StayOn:
-			days = int(self.TimeStamp) // 1440
-			hours = int(self.TimeStamp % 1440) // 60
-			mins = (self.TimeStamp % 60)
-			timeText = f"@ {days}D {hours}h {mins:.1f}m"
+			timeText = MinsToDHM(self.TimeStamp)
 			self.TimeImage = System.TextFontSmall.render(timeText, True, GraphicObject.dark_grey)
 
 		wn.blit(self.ImageLabel, (self.X - self.ImageLabel.get_width()//2, self.Y + self.Radius + System.TEXT_GAP))
